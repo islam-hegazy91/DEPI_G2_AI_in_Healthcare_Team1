@@ -1,0 +1,595 @@
+{
+  "name": "DEPI project - Patient Input",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## 1. Patient Input\n\n- Accepts Audio and Text only\n- Workflow ensures that only humans can use, not bots.\n- Guardrails for human harm (Suicide / killing) is added\n- Guardrails for Prompt Injection is added\n- Guardrails for NFSW content is added\n- Unified Node for both Audio and Text is added to unify outcome\n- \"Text Check\" nodes to be removed and connected to the next node (De-identification and PHI workflow)\n- Telegram credentials are needed\n- Google credentials are needed (Or Whisper run locally to be adjusted)\n- Open router credentials are needed (Or Ollama to replace the AI model used for Prompt Injection evaluation) ",
+        "height": 944,
+        "width": 2240
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        560,
+        -1408
+      ],
+      "id": "327db65e-06a7-4672-befa-afe47bea915c",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "text": "={{ $('Output').item.json.user_message }}",
+        "guardrails": {
+          "keywords": "ignore, over ride, override, jailbreak, forget, avoid",
+          "jailbreak": {
+            "value": {
+              "threshold": 0.2
+            }
+          },
+          "nsfw": {
+            "value": {
+              "threshold": 0.2
+            }
+          }
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.guardrails",
+      "typeVersion": 2,
+      "position": [
+        2224,
+        -1248
+      ],
+      "id": "d524ece0-4015-488b-83d4-9f03e72942e4",
+      "name": "Prompt Injection Guardrail1"
+    },
+    {
+      "parameters": {
+        "model": "nvidia/nemotron-3.5-lightning:free",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        2192,
+        -1040
+      ],
+      "id": "196d1ecb-a920-4f25-83f2-f6e138cd25bd",
+      "name": "OpenRouter Chat Model2",
+      "credentials": {
+        "openRouterApi": {
+          "id": "OzAtuSzD3I3BkV1m",
+          "name": "OpenRouter account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "df5cfcdd-d33a-48c5-8654-68fe0590cffc",
+                    "leftValue": "={{ $json.message?.voice || $json.message?.audio ? 'audio' : $json.message?.text ? 'text' : 'other' }}",
+                    "rightValue": "audio",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Audio"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "82992567-d78a-431a-b8d4-5ace5a5079b0",
+                    "leftValue": "={{ $json.message?.voice || $json.message?.audio ? 'audio' : $json.message?.text ? 'text' : 'other' }}",
+                    "rightValue": "text",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Text"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "01308b71-f854-46db-865a-568ef98e5eb4",
+                    "leftValue": "={{ $json.message?.voice || $json.message?.audio ? 'audio' : $json.message?.text ? 'text' : 'other' }}",
+                    "rightValue": "other",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Other"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        1184,
+        -1056
+      ],
+      "id": "540d74bb-0ede-495a-9bee-81fe4966e8e9",
+      "name": "Audio or Text?"
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "fileId": "={{ $json.message.voice.file_id }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1360,
+        -1152
+      ],
+      "id": "5cbe7f72-d3eb-4d13-a204-9809b94b7bae",
+      "name": "Download Audio file",
+      "webhookId": "aaa224eb-05c1-4f4e-afa5-89797ae0a243",
+      "credentials": {
+        "telegramApi": {
+          "id": "Yi3Tq2GU6dwh6zU9",
+          "name": "Drug interaction bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.5,
+      "position": [
+        720,
+        -928
+      ],
+      "id": "f62abf1e-410f-4587-aa92-6cc94a01ff4e",
+      "name": "Doctor's input in telegram (Audio/Text)",
+      "webhookId": "f5204ad2-3c44-4ba4-881f-927314f081f3",
+      "credentials": {
+        "telegramApi": {
+          "id": "Yi3Tq2GU6dwh6zU9",
+          "name": "Drug interaction bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Doctor\\'s input in telegram (Audio/Text)').item.json.message.from.id }}",
+        "text": "Access denied. Our AI solution does not support bot inputs, only authorized humans are allowed to proceed.",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1136,
+        -672
+      ],
+      "id": "fb192885-0b78-4a19-bdf1-b8c4fc9cc492",
+      "name": "Access denied node for bots",
+      "webhookId": "b0d7eda7-2419-4f74-b8cc-49ed070c51ba",
+      "credentials": {
+        "telegramApi": {
+          "id": "Yi3Tq2GU6dwh6zU9",
+          "name": "Drug interaction bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "fb99f787-2674-4f60-b545-4e7ce5a50ba2",
+              "leftValue": "={{ $json.message.from.is_bot }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "cf5961a6-6396-407b-bed3-5083c5afd3ec",
+              "leftValue": "={{ $json.message.from.is_bot }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        944,
+        -928
+      ],
+      "id": "38400630-3229-4a3d-b6ac-1d095267ebb1",
+      "name": "Human or Bot confirmation"
+    },
+    {
+      "parameters": {
+        "resource": "audio",
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-3.6-flash",
+          "mode": "list",
+          "cachedResultName": "models/gemini-3.6-flash"
+        },
+        "inputType": "binary",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        1584,
+        -1152
+      ],
+      "id": "3198bc65-c8af-4eb0-8a1e-b84e0d30f858",
+      "name": "Transcribe a recording",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "YeVbtzwUGBm1EmVq",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "text": "={{ $json.user_message }}",
+        "guardrails": {
+          "keywords": "kill, قتل, suicide, unalive, k1ll, delete, go to sleep"
+        },
+        "customizeSystemMessage": true,
+        "systemMessage": "Determine whether the user is requesting harmful, violent, self-harm,\nillegal, or malicious actions.\n\nDo NOT flag legitimate clinical or radiology content merely because it\nmentions injury, death, suicide, violence, trauma, weapons, or other\nharm-related medical terms.\n\nFlag only when the user's intent is to request, encourage, facilitate,\nor carry out harmful or malicious activity."
+      },
+      "type": "@n8n/n8n-nodes-langchain.guardrails",
+      "typeVersion": 2,
+      "position": [
+        1968,
+        -1040
+      ],
+      "id": "fe4a81e0-5aad-4fa5-b534-9bc5e5558eb7",
+      "name": "Harmful text Guardrail"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Doctor\\'s input in telegram (Audio/Text)').item.json.message.from.id }}",
+        "text": "Policy violation regarding human harm detected.",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2320,
+        -832
+      ],
+      "id": "7e04f513-a000-4318-9028-eac55148ae5a",
+      "name": "Policy violation message",
+      "webhookId": "9a1434d7-e3a5-4a6f-92f6-5bb1ee4db31e",
+      "credentials": {
+        "telegramApi": {
+          "id": "Yi3Tq2GU6dwh6zU9",
+          "name": "Drug interaction bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Doctor\\'s input in telegram (Audio/Text)').item.json.message.from.id }}",
+        "text": "Policy violation related to AI misuse detected.",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2576,
+        -1184
+      ],
+      "id": "4de1553c-a235-49a3-bf27-fc0b72882277",
+      "name": "Prompt injection rejection",
+      "webhookId": "6dd8df2b-ca68-4f71-abf2-94b46a6f2904",
+      "credentials": {
+        "telegramApi": {
+          "id": "Yi3Tq2GU6dwh6zU9",
+          "name": "Drug interaction bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "06f56cc1-0644-49e0-bcb0-e64beb1fc999",
+              "name": "user_message",
+              "value": "={{ $json.content?.parts?.[0]?.text || $json.message?.text || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "ed88c1a8-22db-4872-a5e6-3c31a525f36e",
+              "name": "",
+              "value": "",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        1808,
+        -1040
+      ],
+      "id": "d7ac132e-1bfb-4bb8-a409-1cd97f7af73a",
+      "name": "Output"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Doctor\\'s input in telegram (Audio/Text)').item.json.message.chat.id }}",
+        "text": "Test OK",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2576,
+        -1344
+      ],
+      "id": "f57d48c0-37fb-4f22-b571-5cebd4bc34ec",
+      "name": "Text check",
+      "webhookId": "3139a0f8-eba7-4fd8-8898-d45bac42b09a",
+      "credentials": {
+        "telegramApi": {
+          "id": "Yi3Tq2GU6dwh6zU9",
+          "name": "Drug interaction bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Doctor\\'s input in telegram (Audio/Text)').item.json.message.chat.id }}",
+        "text": "Invalid input. Please try again, using either Text or Audio.",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1360,
+        -912
+      ],
+      "id": "628168e1-ba74-4800-9737-48b3e267f795",
+      "name": "Invalid input",
+      "webhookId": "4e53c8a7-5ce8-4513-b8e7-05e7a70b73ef",
+      "credentials": {
+        "telegramApi": {
+          "id": "Yi3Tq2GU6dwh6zU9",
+          "name": "Drug interaction bot"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Prompt Injection Guardrail1": {
+      "main": [
+        [
+          {
+            "node": "Text check",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prompt injection rejection",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Chat Model2": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Prompt Injection Guardrail1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Audio or Text?": {
+      "main": [
+        [
+          {
+            "node": "Download Audio file",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Output",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Invalid input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Doctor's input in telegram (Audio/Text)": {
+      "main": [
+        [
+          {
+            "node": "Human or Bot confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Human or Bot confirmation": {
+      "main": [
+        [
+          {
+            "node": "Audio or Text?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Access denied node for bots",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Audio file": {
+      "main": [
+        [
+          {
+            "node": "Transcribe a recording",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transcribe a recording": {
+      "main": [
+        [
+          {
+            "node": "Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Harmful text Guardrail": {
+      "main": [
+        [
+          {
+            "node": "Prompt Injection Guardrail1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Policy violation message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Output": {
+      "main": [
+        [
+          {
+            "node": "Harmful text Guardrail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Invalid input": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "a65ab49c-6175-42b0-815f-24a9af5c32d0",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "61c6bb57adce1727617636865e872d1c9929104eeab03d679e0fe35d5b45be7f"
+  },
+  "nodeGroups": [],
+  "id": "HqCnUJlf86ZHm95p",
+  "tags": []
+}
