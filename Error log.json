@@ -1,0 +1,107 @@
+{
+  "name": "Error log",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        -144,
+        16
+      ],
+      "id": "4a55b351-d846-4e31-b236-20bb9e0e875d",
+      "name": "Error Trigger"
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "value": "ClYdgAe9Jyymts8J",
+          "mode": "list",
+          "cachedResultName": "Error log",
+          "cachedResultUrl": "/projects/urB48fPOGsWNyxik/datatables/ClYdgAe9Jyymts8J"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "workflow_name": "={{ $json.workflow.name }}",
+            "message": "={{ $json.execution.error.message }}",
+            "error_node": "={{ $json.execution.lastNodeExecuted }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "workflow_name",
+              "displayName": "workflow_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "error_node",
+              "displayName": "error_node",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "message",
+              "displayName": "message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        64,
+        16
+      ],
+      "id": "d776d7b5-237b-42f2-a0c4-e2b825b072a9",
+      "name": "Insert row"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Insert row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "dabb66d4-a26e-49ad-9732-0683af0d95b8",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "5cf6f05dd599e8767968125d58144483829b78b99521420f3666805b6f0f13d2"
+  },
+  "nodeGroups": [],
+  "id": "UALLfVvpWB46Xf16",
+  "tags": []
+}

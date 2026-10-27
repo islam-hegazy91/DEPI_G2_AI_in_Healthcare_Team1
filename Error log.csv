@@ -1,0 +1,10 @@
+﻿workflow_name,error_node,message
+Example Workflow,Node With Error,Example Error Message
+Radiology Report Bot - DEPI Final project complete workflow,TopicGuard,"Guardrail validation failed: timed out waiting for llama-server to start - "
+Radiology Report Bot - DEPI Final project complete workflow,Presidio analyze,"The connection to the server was closed unexpectedly, perhaps it is offline. You can retry the request immediately or wait and retry later."
+Radiology Report Bot - DEPI Final project complete workflow,Add patient details,Complete HTML document not found. [line 165]
+Radiology Report Bot - DEPI Final project complete workflow,Presidio analyze,"The connection to the server was closed unexpectedly, perhaps it is offline. You can retry the request immediately or wait and retry later."
+Radiology Report Bot - DEPI Final project complete workflow,,
+Radiology Report Bot - DEPI Final project complete workflow,,
+Radiology Report Bot - DEPI Final project complete workflow,,
+Radiology Report Bot - DEPI Final project complete workflow,System message 1 - Update user,"The connection to the server was closed unexpectedly, perhaps it is offline. You can retry the request immediately or wait and retry later."
