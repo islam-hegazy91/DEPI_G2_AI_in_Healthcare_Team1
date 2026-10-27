@@ -1,0 +1,282 @@
+{
+  "name": "Workflow 5 - Report creation and Delivery (AbdelRahman)",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -448,
+        -144
+      ],
+      "id": "eb35af91-bef1-4e50-b93c-7905f8fe7e31",
+      "name": "Data from Workflow 4"
+    },
+    {
+      "parameters": {
+        "jsCode": "\n/**\n * RADRAFT — DIGITAL APPROVAL\n * Workflow 5\n *\n * Confirms successful Telegram delivery\n * and prepares an approved report for quota deduction.\n *\n * No Case ID required.\n */\n\nconst telegram = $('Send Final Report to Doctor').first().json;\nconst source = $('Data from Workflow 4').first().json;\n\n// 1. Confirm Telegram successfully sent the report.\nif (\n  telegram.ok !== true ||\n  !telegram.result?.document\n) {\n  throw new Error(\n    'DIGITAL_APPROVAL: Final report was not successfully sent.'\n  );\n}\n\n// 2. Obtain the authorized doctor's chat ID.\nconst chatId =\n  source.chat_id ??\n  telegram.result?.chat?.id ??\n  null;\n\nif (chatId === null || chatId === undefined || chatId === '') {\n  throw new Error(\n    'DIGITAL_APPROVAL: Missing Telegram chat ID.'\n  );\n}\n\n// 3. Verify that an approved report was received.\nconst approvedReport = String(\n  source.approved_report ?? ''\n);\n\nif (!approvedReport.trim()) {\n  throw new Error(\n    'DIGITAL_APPROVAL: Approved report is missing.'\n  );\n}\n\n// 4. Preserve the approval timestamp.\n// Never invent an approval time.\nconst approvedAt =\n  source.approved_at ??\n  source.approval_date ??\n  null;\n\n// 5. Return data for the subscription workflow.\nreturn [{\n  json: {\n    chat_id: String(chatId),\n\n    doctor_name:\n      source.doctor_name ?? null,\n\n    approved_report: approvedReport,\n\n    approved_at: approvedAt,\n\n    status: 'approved',\n\n    delivery_status: 'sent',\n\n    telegram_message_id:\n      telegram.result.message_id ?? null,\n\n    telegram_file_id:\n      telegram.result.document.file_id ?? null,\n\n    subscription_deduction_required: true\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        -144
+      ],
+      "id": "621b5fca-c202-454d-95f6-e76dbc5cd82e",
+      "name": "Digital Approval"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "HpDTggBpEzjBemEY",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/HpDTggBpEzjBemEY",
+          "cachedResultName": "Radiology Report Bot - DEPI Final project (Workflow 2 - Token count)"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1264,
+        -144
+      ],
+      "id": "9ab15952-4671-48da-9a9a-4e33e796c50e",
+      "name": "Activate report count workflow"
+    },
+    {
+      "parameters": {
+        "operation": "sendDocument",
+        "chatId": "={{ $('Data from Workflow 4').item.json.chat_id }}",
+        "binaryData": true,
+        "additionalFields": {
+          "caption": "=✅ *Final Approved Radiology Report*"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        816,
+        -144
+      ],
+      "id": "5847bcc5-cf9c-42aa-b09b-c7545dad64fc",
+      "name": "Send Final Report to Doctor",
+      "webhookId": "12c78eba-3bd2-469e-be4d-cd3e35e3e8b0",
+      "credentials": {
+        "telegramApi": {
+          "id": "O5f3EeLhcQGXMIsT",
+          "name": "Radiology report bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "anthropic/claude-haiku-5.5",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        -304,
+        64
+      ],
+      "id": "bf2efda5-2092-4313-8a85-6eb170535cae",
+      "name": "OpenRouter Chat Model3",
+      "credentials": {
+        "openRouterApi": {
+          "id": "az4eqj2jNwYuDKLx",
+          "name": "OpenRouter account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.approved_report }}",
+        "options": {
+          "systemMessage": "# SYSTEM PROMPT — PROFESSIONAL RADIOLOGY REPORT HTML BUILDER\n\n## ROLE AND OBJECTIVE\n\nAct as a professional radiology report formatter.\n\nConvert the supplied radiologist-approved radiology report into a clean, professional, well-structured, standalone HTML5 document suitable for clinical use, printing, and subsequent conversion into PDF, plain text, JSON, XML, or structured RIS/PACS fields.\n\nThe final document must resemble a professionally issued radiology report, not an AI-generated calculation summary.\n\nYour responsibility is strictly limited to:\n\n1. Formatting the supplied clinical report.\n2. Preserving all approved clinical information.\n3. Organizing existing findings into readable HTML.\n4. Creating a standardized patient information header.\n5. Creating a standardized reporting radiologist signature area.\n6. Producing valid, standalone HTML ready for downstream processing.\n\nDo not independently interpret clinical findings, perform calculations, or create additional diagnoses.\n\nThe patient identity, report date, and radiologist name will be inserted later by the n8n workflow.\n\n---\n\n## 1. CONTENT PRESERVATION — MANDATORY\n\nPreserve all clinically relevant information contained in the supplied report, including:\n\n- Examination details.\n- Clinical indications.\n- Imaging findings.\n- Measurements and units.\n- Anatomical locations.\n- Laterality.\n- Relevant positive and negative findings.\n- Interpretations.\n- Diagnostic classifications.\n- Scores and component scores.\n- Differential diagnoses.\n- Recommendations.\n- Clinical uncertainties.\n- Relevant guideline references.\n\nCorrect spelling, grammar, punctuation, and formatting inconsistencies only when doing so does not change clinical meaning.\n\nNever:\n\n- Invent patient-specific clinical information.\n- Add undocumented findings.\n- Create normal findings for structures that were not described.\n- Modify supplied measurements.\n- Change anatomical laterality.\n- Change a classification or score.\n- Independently calculate scores or derived measurements.\n- Add new diagnoses or recommendations.\n- Convert uncertain findings into confirmed diagnoses.\n- Remove clinically important information.\n- Silently resolve contradictions.\n\nIf clinically meaningful ambiguity is present, preserve its meaning rather than guessing.\n\nThe supplied approved report is the authoritative source for all clinical content.\n\n---\n\n## 2. STANDARDIZED REPORT LAYOUT\n\nEvery generated HTML document must follow this overall structure:\n\n1. Report title.\n2. Patient information header.\n3. Clinical report content.\n4. Reporting radiologist signature area.\n\nThe patient header and signature area are mandatory document elements.\n\nThe clinical sections between them must adapt to the actual examination and available findings.\n\nDo not create missing clinical sections merely to fill a template.\n\n---\n\n## 3. PATIENT INFORMATION HEADER — MANDATORY\n\nImmediately below the main report title, include a professionally formatted patient information section.\n\nIt must contain exactly these administrative fields:\n\n**Patient Name:** `{{PATIENT_NAME}}`\n\n**Patient Age:** `{{PATIENT_AGE}}`\n\n**Report Date:** `{{REPORT_DATE}}`\n\nThese are literal placeholders, not values to calculate or replace yourself.\n\n### Critical rules\n\n1. Always include all three fields.\n2. Preserve each placeholder exactly, including its capitalization and double curly braces.\n3. Never replace these placeholders with patient information from the clinical report.\n4. Never invent a patient name, age, or date.\n5. Never calculate patient age.\n6. Never use sample patient names or demonstration values.\n7. Never use the current system date as the report date.\n8. Do not expose anonymization tokens such as `[PERSON_1]` or `[DOB_1]` in the final patient header.\n9. The downstream n8n Code node is exclusively responsible for populating these fields.\n\n### Required HTML structure\n\nUse the following exact semantic structure and class names:\n\n```html\n<section class=\"patient-info\" id=\"patient-information\">\n  <div class=\"patient-info-grid\">\n    <div class=\"patient-field\">\n      <span class=\"field-label\">Patient Name</span>\n      <span class=\"field-value\">{{PATIENT_NAME}}</span>\n    </div>\n\n    <div class=\"patient-field\">\n      <span class=\"field-label\">Patient Age</span>\n      <span class=\"field-value\">{{PATIENT_AGE}}</span>\n    </div>\n\n    <div class=\"patient-field\">\n      <span class=\"field-label\">Report Date</span>\n      <span class=\"field-value\">{{REPORT_DATE}}</span>\n    </div>\n  </div>\n</section>\n```\n\nDo not change the placeholder names or the element IDs and class names specified above.\n\nThis section must appear immediately after the report title and before the first clinical section.\n\n---\n\n## 4. ADAPTIVE CLINICAL REPORT STRUCTURE\n\nThe supplied report may contain any number of clinical sections.\n\nIdentify and format only the clinical sections actually present.\n\nPossible sections include:\n\n- Examination / Technique.\n- Clinical Indication.\n- Findings.\n- Important Negative Findings.\n- Impression / Interpretation.\n- Differential Diagnosis.\n- Recommendations.\n- Scoring / Grading / Classification.\n- References.\n\nDo not force the inclusion of absent clinical sections.\n\nMaintain the original hierarchy and clinical meaning.\n\nUse professional radiology reporting conventions.\n\n### Findings\n\nPresent findings using readable paragraphs or lists.\n\nPreserve:\n\n- Lesion descriptions.\n- Anatomical locations.\n- Measurements.\n- Imaging characteristics.\n- Vascular findings.\n- Relevant negative findings.\n- Comparison information.\n\nAvoid unnecessarily converting descriptive findings into tables.\n\n### Impression\n\nPresent the approved interpretation clearly and concisely.\n\nDo not change the approved diagnostic certainty.\n\n### Classifications\n\nWhen an approved classification is present, display it clearly.\n\nExamples:\n\n- BI-RADS Category 5.\n- ACR TI-RADS TR5.\n- PI-RADS 4.\n- LI-RADS LR-5.\n\nThese are examples of formatting, not permission to assign classifications.\n\nDo not modify or independently verify scores.\n\n### Recommendations\n\nPreserve the radiologist-approved recommendations.\n\nDo not invent management pathways, follow-up intervals, or procedures.\n\n---\n\n## 5. CLINICAL REPORT PRESENTATION\n\nThe final document must read like a professional radiology report rather than a technical calculator output.\n\nUse conventional clinical terminology.\n\nAvoid unnecessary repetition.\n\nClinical conclusions should appear within the appropriate report sections.\n\nDo not include standalone technical commentary describing how the report was generated.\n\n### Internal technical information\n\nDo not reproduce the following as patient-facing content:\n\n- AI model descriptions.\n- Calculator execution logs.\n- Tool status messages.\n- Internal processing instructions.\n- Automated workflow explanations.\n- Generic AI disclaimers.\n- Statements that calculations were performed deterministically.\n- Statements that an already approved report still requires radiologist approval.\n\nHowever, preserve all clinically significant information.\n\nFor example, retain:\n\n\"BI-RADS Category 5 — Highly Suggestive of Malignancy.\"\n\nDo not present this merely as an AI warning.\n\nClinically meaningful risk classifications must remain visible.\n\nIf the source includes a technical note that also contains substantive clinical information, preserve the clinical information while omitting only the nonclinical process commentary.\n\nDo not change the underlying clinical assessment.\n\n---\n\n## 6. RADIOLOGIST SIGNATURE SECTION — MANDATORY\n\nEvery report must contain a professional signature area at the bottom.\n\nThe reporting radiologist's name will be retrieved from the PostgreSQL `authorized_users` table.\n\nThe AI Agent must not retrieve, invent, or modify the doctor's identity.\n\n### Required placeholder\n\nUse exactly:\n\n`{{DOCTOR_NAME}}`\n\nDo not substitute a sample name.\n\nDo not automatically add \"Dr.\" because the registered database value may already contain a professional title.\n\n### Required HTML structure\n\n```html\n<section class=\"radiologist-signature\" id=\"radiologist-signature\">\n  <div class=\"signature-space\"></div>\n\n  <div class=\"doctor-name\">\n    {{DOCTOR_NAME}}\n  </div>\n\n  <div class=\"signature-label\">\n    Reporting Radiologist\n  </div>\n\n  <div class=\"signature-caption\">\n    Signature: ______________________\n  </div>\n</section>\n```\n\n### Signature requirements\n\n1. Place this section after all clinical report sections.\n2. Keep it visually separated from the body.\n3. Right-align the signature block.\n4. Provide adequate blank space for a handwritten signature.\n5. Display the PostgreSQL-registered doctor name using the exact placeholder.\n6. Do not invent credentials or institutional affiliations.\n7. Do not generate a handwritten signature, signature image, or digital certificate.\n8. Do not claim the document is cryptographically or electronically signed.\n9. Keep the signature block together when printed.\n10. Never omit the signature area.\n\nThe blank signature space and typed radiologist name are administrative report elements.\n\n---\n\n## 7. HTML DESIGN REQUIREMENTS\n\nGenerate one complete standalone HTML5 document.\n\n### Appearance\n\nUse a clean, professional medical-document design.\n\nVisual characteristics:\n\n- White report background.\n- Dark charcoal or navy body text.\n- One restrained accent color, preferably dark blue.\n- Minimal borders.\n- No gradients.\n- No decorative icons.\n- No colorful cards or excessive highlights.\n- No unnecessary visual elements.\n\nThe document should resemble a formal diagnostic imaging report.\n\n### Typography\n\nUse:\n\n- Arial, Helvetica, or a standard sans-serif font.\n- Body text approximately 14–16 px.\n- Comfortable line spacing.\n- Bold typography for meaningful section headings and labels.\n- Clear hierarchy between title, patient details, clinical findings, impression, and signature.\n\nAvoid oversized headings and excessive empty space.\n\n### Layout\n\nUse a centered report container.\n\nRecommended width:\n\n800–850 px maximum on desktop.\n\nThe design must:\n\n- Adapt to mobile screens.\n- Prevent horizontal scrolling.\n- Allow long clinical content to wrap.\n- Avoid overlapping elements.\n- Preserve the readability of clinical tables.\n- Print cleanly on A4 paper.\n\n### Patient header styling\n\nUse a subtle, professional information block.\n\nThe patient name, age, and report date should be clearly visible.\n\nUse either three columns on desktop or a responsive stacked layout on smaller screens.\n\nAvoid decorative backgrounds or conspicuous borders.\n\n### Signature styling\n\nThe signature section should be aligned to the right near the bottom of the report content.\n\nProvide appropriate separation from the last clinical section.\n\nPrevent page breaks inside the signature block.\n\n---\n\n## 8. REQUIRED CSS CLASSES\n\nUse a small and consistent set of descriptive CSS classes.\n\nAt minimum, support the following classes:\n\n- `report-container`\n- `report-title`\n- `patient-info`\n- `patient-info-grid`\n- `patient-field`\n- `field-label`\n- `field-value`\n- `report-section`\n- `radiologist-signature`\n- `signature-space`\n- `doctor-name`\n- `signature-label`\n- `signature-caption`\n\nDo not rename the mandatory patient and signature classes.\n\nThe downstream processing system depends on predictable markup.\n\nInclude embedded CSS for these classes in the document's `<head>`.\n\nDo not use external stylesheets.\n\n---\n\n## 9. INTEGRATION-FRIENDLY HTML\n\nThe generated document must be easy to transform into:\n\n- PDF.\n- Plain text.\n- JSON.\n- XML.\n- Structured RIS/PACS data.\n\nUse semantic HTML5.\n\nRequirements:\n\n- A single `<main>` element for the overall report content.\n- One `<h1>` report title.\n- `<h2>` for major clinical sections.\n- `<h3>` for documented subsections.\n- `<p>` for clinical narrative text.\n- `<ul>` for unordered findings.\n- `<ol>` for numbered impressions or recommendations when appropriate.\n- `<table>` only for genuinely tabular content.\n- `<section>` for major clinical and administrative blocks.\n\nKeep clinical content as selectable HTML text.\n\nDo not embed clinical text inside images.\n\nDo not use:\n\n- JavaScript.\n- External CSS frameworks.\n- External fonts.\n- Remote images.\n- SVG decorations.\n- Interactive forms.\n- Dynamic content.\n- Unnecessary nested markup.\n\nEnsure valid UTF-8 HTML5.\n\n---\n\n## 10. RESPONSIVE AND PRINT FORMATTING\n\nInclude responsive and print-specific CSS.\n\n### Mobile\n\nThe report must remain readable on mobile devices.\n\nPatient header fields may stack vertically when screen width is limited.\n\nClinical tables must remain readable without clipping important information.\n\n### Printing\n\nUse professional A4 print settings.\n\nRecommended page margins: 15–20 mm.\n\nAvoid breaking the following elements across pages when reasonably possible:\n\n- Patient information header.\n- Clinical section headings and their immediately following content.\n- Short assessment tables.\n- Radiologist signature block.\n\nUse `break-inside: avoid` and appropriate print CSS.\n\nDo not force an entire long report onto a single page.\n\nDo not create an oversized blank area to push the signature to the physical bottom of every page.\n\nThe signature should appear after the report content, with appropriate spacing.\n\n---\n\n## 11. REFERENCES AND GUIDELINES\n\nIf the supplied approved report contains verified citations or guideline references, preserve them and format them professionally.\n\nDo not create new citations.\n\nDo not invent:\n\n- Guideline titles.\n- Publication years.\n- Editions.\n- Authors.\n- DOI identifiers.\n- URLs.\n- Reference numbers.\n\nIf no verified references are present, do not generate a References section merely to state that retrieval failed.\n\nDo not include internal Vector Store retrieval status or database errors in the final report.\n\n---\n\n## 12. PATIENT PRIVACY AND DATA INTEGRITY\n\nThe report formatter may receive clinical content containing anonymized patient identifiers.\n\nDo not attempt to reconstruct patient identities.\n\nDo not replace anonymized tokens with guessed values.\n\nThe patient name and age are populated exclusively by the authorized downstream n8n Code node.\n\nThe reporting radiologist's name is populated exclusively from PostgreSQL.\n\nThe report date is populated by the downstream workflow using the approved report date.\n\nPreserve all clinical information without mixing data from different patients or examinations.\n\nDo not add patient identifiers to HTML comments, hidden fields, metadata, or other parts of the document.\n\n---\n\n## 13. OUTPUT REQUIREMENTS — STRICT\n\nReturn exactly one complete HTML5 document.\n\nThe response must begin with:\n\n`<!DOCTYPE html>`\n\nThe response must end with:\n\n`</html>`\n\nMandatory rules:\n\n1. Return only valid HTML source code.\n2. Do not wrap the output in Markdown code fences.\n3. Do not write ` ```html ` or ` ``` `.\n4. Do not include an introduction before the HTML.\n5. Do not include an explanation after the HTML.\n6. Do not describe the document's features.\n7. Do not include a summary of the formatting process.\n8. Do not include AI-related disclaimers or technical notes.\n9. Do not return JSON or XML instead of HTML.\n10. Do not claim to have created or attached a downloadable file.\n\nThe n8n workflow is responsible for converting the generated HTML string into a file.\n\n---\n\n## 14. FINAL VALIDATION\n\nBefore returning the HTML, verify that:\n\n### Document structure\n\n- A complete HTML5 document exists.\n- Exactly one main report container exists.\n- The report title is present.\n- The patient information header appears immediately below the title.\n- The clinical report follows the header.\n- The radiologist signature appears after the clinical content.\n\n### Mandatory placeholders\n\nThe document contains each of the following exactly once:\n\n- `{{PATIENT_NAME}}`\n- `{{PATIENT_AGE}}`\n- `{{REPORT_DATE}}`\n- `{{DOCTOR_NAME}}`\n\nDo not replace these placeholders.\n\nDo not modify their syntax.\n\n### Clinical integrity\n\n- All approved clinical findings are preserved.\n- No measurements were altered.\n- No classification or score was changed.\n- No patient-specific findings were invented.\n- Relevant recommendations remain intact.\n- No generic normal findings were added.\n- No clinical uncertainty was removed.\n\n### Presentation\n\n- HTML is valid and well structured.\n- CSS is embedded.\n- The report is mobile responsive.\n- A4 printing is supported.\n- Signature space remains blank.\n- The doctor name placeholder is present.\n- There are no unnecessary technical warnings.\n- There are no Markdown code fences.\n- There is no text before or after the HTML document.\n\n---\n\n## 15. PRIMARY OPERATING RULE\n\n**Transform the supplied radiologist-approved clinical report into a professional standalone HTML document while preserving all supported clinical content. Always include a patient information header and radiologist signature section with the exact required placeholders. Never invent patient information, radiologist identities, clinical findings, classifications, recommendations, or citations. Return HTML source code only.**"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -208,
+        -144
+      ],
+      "id": "a2278b46-13fc-41b2-8fbe-1df416e2354d",
+      "name": "HTML builder AI agent"
+    },
+    {
+      "parameters": {
+        "operation": "toText",
+        "sourceProperty": "html",
+        "options": {
+          "fileName": "=\n{{ String($json.chat_id) + '_' + $now.setZone('Africa/Cairo').toFormat('yyyy-MM-dd_HH-mm-ss') + '_' + ($json.patient_name || 'Unknown_Patient') + '.html' }}\n"
+        }
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        592,
+        -144
+      ],
+      "id": "6f76e27c-c49b-4e65-8340-57d3a761e0f8",
+      "name": "JSON to HTML"
+    },
+    {
+      "parameters": {
+        "jsCode": "\n/**\n * CLEAN FINAL HTML REPORT\n * Accepts HTML from \"Add patient details\".\n * Removes unwanted AI text and Markdown fences.\n * Preserves patient details and doctor signature.\n */\n\nreturn $input.all().map((item) => {\n\n  // Read the HTML from the previous Code node.\n  const raw = String(\n    item.json.html ??\n    item.json.output ??\n    ''\n  );\n\n  if (!raw.trim()) {\n    throw new Error(\n      'No HTML content found in the input.'\n    );\n  }\n\n  // Find the start of the HTML document.\n  const start = raw.search(\n    /<!doctype\\s+html\\b|<html\\b/i\n  );\n\n  if (start === -1) {\n    throw new Error(\n      'No opening HTML document found.'\n    );\n  }\n\n  // Find the closing HTML tag.\n  const closingTag = /<\\/html\\s*>/gi;\n  closingTag.lastIndex = start;\n\n  const match = closingTag.exec(raw);\n\n  if (!match) {\n    throw new Error(\n      'HTML closing tag not found.'\n    );\n  }\n\n  // Extract only the complete HTML document.\n  const html = raw\n    .slice(start, match.index + match[0].length)\n    .trim();\n\n  // Confirm patient details and doctor name\n  // placeholders have been replaced.\n  const unresolved = html.match(\n    /\\{\\{(?:PATIENT_NAME|PATIENT_AGE|REPORT_DATE|DOCTOR_NAME)\\}\\}/g\n  );\n\n  if (unresolved) {\n    throw new Error(\n      'Unresolved report placeholders: ' +\n      [...new Set(unresolved)].join(', ')\n    );\n  }\n\n  return {\n    json: {\n      ...item.json,\n      html\n    }\n  };\n});\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        368,
+        -144
+      ],
+      "id": "62a11028-45cb-4324-af7b-b9279c6d0ca3",
+      "name": "Clean HTML code"
+    },
+    {
+      "parameters": {
+        "jsCode": "\n/**\n * RADRAFT — ADD PATIENT DETAILS\n * Workflow 5: HTML report finalization\n *\n * Sources:\n * - HTML builder AI agent\n * - Data from Workflow 4\n *\n * Missing patient information remains blank.\n * No duplicate HTML sections are created.\n */\n\nconst source = $('Data from Workflow 4').first().json;\nconst report = $('HTML builder AI agent').first().json;\n\n// Trusted patient metadata\nconst mapping = source.patient_metadata_mapping ?? {};\nconst metadata = source.patient_metadata_rest ?? {};\n\n// Never infer patient identity from clinical wording.\n// PERSON_1 must originate from a verified patient name.\nconst patientName = String(\n  source.patient_name ??\n  (source.patient_name_verified === true\n    ? mapping['[PERSON_1]']\n    : '') ??\n  ''\n).trim();\n\nconst patientDOB = String(\n  source.patient_dob ??\n  metadata.date_of_birth ??\n  mapping['[DOB_1]'] ??\n  ''\n).trim();\n\nconst statedAge =\n  source.patient_age ??\n  metadata.stated_age ??\n  null;\n\nconst doctorName = String(\n  source.doctor_name ?? ''\n).trim();\n\n// Use the approval timestamp only when provided.\nconst timestamp =\n  source.approved_at ??\n  source.approval_date ??\n  null;\n\nconst approvalDate = timestamp\n  ? new Date(timestamp)\n  : null;\n\nconst hasValidDate =\n  approvalDate instanceof Date &&\n  !Number.isNaN(approvalDate.getTime());\n\nfunction escapeHtml(value) {\n  return String(value ?? '')\n    .replace(/&/g, '&amp;')\n    .replace(/</g, '&lt;')\n    .replace(/>/g, '&gt;')\n    .replace(/\"/g, '&quot;')\n    .replace(/'/g, '&#39;');\n}\n\nfunction calculateAge(dob, referenceDate) {\n  if (!dob || !referenceDate) return null;\n\n  let year, month, day;\n\n  let match = dob.match(\n    /^(\\d{1,2})[/-](\\d{1,2})[/-](\\d{4})$/\n  );\n\n  if (match) {\n    day = Number(match[1]);\n    month = Number(match[2]);\n    year = Number(match[3]);\n  } else {\n    match = dob.match(\n      /^(\\d{4})-(\\d{2})-(\\d{2})$/\n    );\n\n    if (!match) return null;\n\n    year = Number(match[1]);\n    month = Number(match[2]);\n    day = Number(match[3]);\n  }\n\n  const birthDate = new Date(\n    Date.UTC(year, month - 1, day)\n  );\n\n  if (\n    birthDate.getUTCFullYear() !== year ||\n    birthDate.getUTCMonth() !== month - 1 ||\n    birthDate.getUTCDate() !== day\n  ) {\n    return null;\n  }\n\n  const parts = new Intl.DateTimeFormat('en-GB', {\n    timeZone: 'Africa/Cairo',\n    year: 'numeric',\n    month: '2-digit',\n    day: '2-digit'\n  }).formatToParts(referenceDate);\n\n  const value = type => Number(\n    parts.find(part => part.type === type)?.value\n  );\n\n  let age = value('year') - year;\n\n  if (\n    value('month') < month ||\n    (\n      value('month') === month &&\n      value('day') < day\n    )\n  ) {\n    age--;\n  }\n\n  return age >= 0 && age <= 130 ? age : null;\n}\n\nconst suppliedAge =\n  statedAge !== null &&\n  statedAge !== '' &&\n  Number.isInteger(Number(statedAge)) &&\n  Number(statedAge) >= 0 &&\n  Number(statedAge) <= 130\n    ? Number(statedAge)\n    : null;\n\nconst age = suppliedAge ?? (\n  hasValidDate\n    ? calculateAge(patientDOB, approvalDate)\n    : null\n);\n\nconst formattedDate = hasValidDate\n  ? new Intl.DateTimeFormat('en-GB', {\n      timeZone: 'Africa/Cairo',\n      day: '2-digit',\n      month: 'long',\n      year: 'numeric'\n    }).format(approvalDate)\n  : '';\n\n// Extract standalone HTML.\nconst raw = String(\n  report.output ?? report.html ?? ''\n);\n\nconst start = raw.search(/<!doctype\\s+html\\b|<html\\b/i);\n\nif (start < 0) {\n  throw new Error(\n    'HTML_FINALIZATION_ERROR: HTML document not found.'\n  );\n}\n\nconst closing = /<\\/html\\s*>/gi;\nclosing.lastIndex = start;\n\nconst end = closing.exec(raw);\n\nif (!end) {\n  throw new Error(\n    'HTML_FINALIZATION_ERROR: Closing HTML tag missing.'\n  );\n}\n\nlet html = raw.slice(\n  start,\n  end.index + end[0].length\n);\n\n// Fill existing placeholders only.\nconst replacements = {\n  '{{PATIENT_NAME}}': escapeHtml(patientName),\n  '{{PATIENT_AGE}}':\n    age !== null ? `${age} years` : '',\n  '{{REPORT_DATE}}': escapeHtml(formattedDate),\n  '{{DOCTOR_NAME}}': escapeHtml(doctorName)\n};\n\nfor (const [placeholder, replacement] of Object.entries(replacements)) {\n  const count = html.split(placeholder).length - 1;\n\n  if (count !== 1) {\n    throw new Error(\n      `HTML_FINALIZATION_ERROR: Expected one ${placeholder}, found ${count}.`\n    );\n  }\n\n  html = html.replace(placeholder, replacement);\n}\n\n// Validate placeholder replacement.\nif (\n  /\\{\\{(?:PATIENT_NAME|PATIENT_AGE|REPORT_DATE|DOCTOR_NAME)\\}\\}/\n    .test(html)\n) {\n  throw new Error(\n    'HTML_FINALIZATION_ERROR: Unresolved placeholders.'\n  );\n}\n\nreturn [{\n  json: {\n    html,\n\n    chat_id:\n      source.chat_id != null\n        ? String(source.chat_id)\n        : null,\n\n    report_date: formattedDate,\n    patient_name: patientName || null,\n    patient_age: age,\n    doctor_name: doctorName || null,\n\n    patient_data_status:\n      !patientName && age === null\n        ? 'SKIPPED - No patient data provided'\n        : !patientName || age === null\n          ? 'PARTIAL - Missing patient fields left blank'\n          : 'COMPLETE'\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        144,
+        -144
+      ],
+      "id": "b6e9fe10-cdfe-49d5-a0d5-506b0e344262",
+      "name": "Add patient details"
+    },
+    {
+      "parameters": {
+        "content": "### Workflow name\nRendering, Delivery & Usage *(Workflow 5)*\n\n### Owner\n\nAbdelRahman Diab\n\n### Purpose\nGenerate the final format of the approved report and deliver it to the doctor.\n\n### Trigger\nThe generated approved report draft from workflow 3 or the approved edited report from workflow 4\n\n### Input\nApproved reports, doctor identity and timestamp.\n\n### Steps\n1- Build the HTML form of the report.\n2- Insert doctor and patient fields.\n3- Clean the HTML.\n4- Convert to HTML file\n5- Send the HTML file to the user.\n6- Update session usage count.\n\n### AI component \nAI agent\n\n### Tools and data sources\n1- AI agent with LLM\n2- Postgres SQL\n3- Code nodes\n4- Convert to file node\n5- Telegram action (send document)\n\n### Output\nFinal clinician-facing report file, delivery status and usage/quota event\n\n### Risk tier\nMedium\n\n### Human approval point\nOnly approved content enters final rendering/delivery.\n\n### If it fails\nAbort on unresolved placeholders or invalid HTML; preserve approved report; notify user of delivery failure.\n\n### Logging and tracing\nLog rendering status, delivery status, final report/version ID, quota update outcome.\n\n### Test cases\n\n",
+        "height": 976,
+        "width": 646
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1216,
+        -512
+      ],
+      "typeVersion": 1,
+      "id": "936c15f1-a560-4602-9e0a-c4e3ef41bf3a",
+      "name": "Sticky Note4"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Digital Approval": {
+      "main": [
+        [
+          {
+            "node": "Activate report count workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Final Report to Doctor": {
+      "main": [
+        [
+          {
+            "node": "Digital Approval",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Chat Model3": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "HTML builder AI agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTML builder AI agent": {
+      "main": [
+        [
+          {
+            "node": "Add patient details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "JSON to HTML": {
+      "main": [
+        [
+          {
+            "node": "Send Final Report to Doctor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clean HTML code": {
+      "main": [
+        [
+          {
+            "node": "JSON to HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add patient details": {
+      "main": [
+        [
+          {
+            "node": "Clean HTML code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Data from Workflow 4": {
+      "main": [
+        [
+          {
+            "node": "HTML builder AI agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "3e700b79-c401-45cc-9407-83c7471cd156",
+  "meta": {
+    "instanceId": "5cf6f05dd599e8767968125d58144483829b78b99521420f3666805b6f0f13d2"
+  },
+  "nodeGroups": [],
+  "id": "0jSZTg5IltBXMPST",
+  "tags": []
+}

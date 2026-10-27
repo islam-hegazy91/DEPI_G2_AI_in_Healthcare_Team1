@@ -1,0 +1,109 @@
+{
+  "name": "Radiology report - Internal Admin Dashboard - Manual entry",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -336,
+        -32
+      ],
+      "id": "09997395-5fe5-42c3-a73a-33bb07cd7732",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "value": "public",
+          "mode": "list",
+          "cachedResultName": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "authorized_users",
+          "mode": "list",
+          "cachedResultName": "authorized_users"
+        },
+        "limit": 80000,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        -128,
+        -32
+      ],
+      "id": "e32f3a5d-f228-4238-89b3-2b188652679f",
+      "name": "Select rows from a table",
+      "credentials": {
+        "postgres": {
+          "id": "XGwfwfvSssHEEG48",
+          "name": "Local Postgres for Radiology Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "\nINSERT INTO public.authorized_users (\n    telegram_id,\n    full_name,\n    sessions_available,\n    account_status\n)\nVALUES (\n    '1077098318',\n    'Omaima Abdelrazeq',\n    40,\n    'active'\n)\nON CONFLICT (telegram_id)\nDO UPDATE SET\n    full_name = EXCLUDED.full_name,\n    sessions_available = 40,\n    account_status = 'active'\nRETURNING\n    telegram_id,\n    full_name,\n    sessions_available,\n    account_status;\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        80,
+        -32
+      ],
+      "id": "26fc8ce7-081b-4a77-8c1d-95e4a86694a2",
+      "name": "Execute a SQL query",
+      "credentials": {
+        "postgres": {
+          "id": "XGwfwfvSssHEEG48",
+          "name": "Local Postgres for Radiology Bot"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Select rows from a table",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Select rows from a table": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "244de81f-cb5e-4e0e-9100-9d9ede9072b4",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "5cf6f05dd599e8767968125d58144483829b78b99521420f3666805b6f0f13d2"
+  },
+  "nodeGroups": [],
+  "id": "yoEGPOexWBw77ngj",
+  "tags": []
+}

@@ -1,0 +1,443 @@
+{
+  "name": "Workflow 2 - Privacy and Guardrails (Radwa)",
+  "nodes": [
+    {
+      "parameters": {
+        "text": "={{ $json.user_input }}",
+        "guardrails": {
+          "keywords": "kill, قتل, suicide, unalive, k1ll, delete, go to sleep"
+        },
+        "customizeSystemMessage": true,
+        "systemMessage": "Determine whether the user is requesting harmful, violent, self-harm,\nillegal, or malicious actions.\n\nDo NOT flag legitimate clinical or radiology content merely because it\nmentions injury, death, suicide, violence, trauma, weapons, or other\nharm-related medical terms.\n\nFlag only when the user's intent is to request, encourage, facilitate,\nor carry out harmful or malicious activity."
+      },
+      "type": "@n8n/n8n-nodes-langchain.guardrails",
+      "typeVersion": 2,
+      "position": [
+        -480,
+        96
+      ],
+      "id": "4ea1e0b6-a2c1-4aa9-b03d-25c43e12c065",
+      "name": "Harmful text Guardrail"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Data from Workflow 1').item.json.chat_id }}",
+        "text": "Policy violation regarding human harm detected.",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -256,
+        192
+      ],
+      "id": "f511948b-50e2-4a13-81a1-b43d1e818182",
+      "name": "Policy violation message",
+      "webhookId": "c5ae91fc-9c6d-4887-b528-a9162ee5a42f",
+      "credentials": {
+        "telegramApi": {
+          "id": "O5f3EeLhcQGXMIsT",
+          "name": "Radiology report bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Data from Workflow 1').item.json.chat_id }}",
+        "text": "This request cannot be processed. Please provide clinical information or imaging findings for the radiology report.",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        320,
+        96
+      ],
+      "id": "c0613728-24ec-4370-8a36-5b5b838fa82c",
+      "name": "Prompt injection rejection",
+      "webhookId": "55b7f10a-5bc7-46b9-b3ae-9af5b7ec2e62",
+      "credentials": {
+        "telegramApi": {
+          "id": "O5f3EeLhcQGXMIsT",
+          "name": "Radiology report bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "text": "={{ $json.guardrailsInput }}",
+        "guardrails": {
+          "keywords": "ignore, bypass, override, forget, انسى, انس, تجاهل, ملكش دعوة"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.guardrails",
+      "typeVersion": 2,
+      "position": [
+        -256,
+        0
+      ],
+      "id": "fc784ecf-e165-46d6-af9a-12503b1f183b",
+      "name": "Prompt Injection Guardrail + NSFW"
+    },
+    {
+      "parameters": {
+        "model": "qwen2.5:0.5b",
+        "options": {
+          "think": false,
+          "temperature": 0.1
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [
+        -16,
+        112
+      ],
+      "id": "41f02628-ef9d-46bd-9e08-1a2783e5e6a0",
+      "name": "Ollama Chat Model",
+      "credentials": {
+        "ollamaApi": {
+          "id": "uz3Kvp3Qw5Xwy6Ry",
+          "name": "Ollama account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\n/**\n * RADRAFT — Regex PHI Detection\n * Mode: Run Once for All Items\n */\n\nconst patterns = {\n  SSN: /\\b\\d{3}-\\d{2}-\\d{4}\\b/g,\n\n  PHONE_EG: /\\b(?:\\+?20[ -]?|0)1[0125]\\d{8}\\b/g,\n\n  PHONE_INTL: /\\b(?:\\+?\\d{1,3}[ -]?)?\\(?\\d{3}\\)?[ -]?\\d{3}[ -]?\\d{4}\\b/g,\n\n  NATIONAL_ID_EG: /\\b[23]\\d{13}\\b/g,\n\n  EMAIL: /\\b[\\w.%+-]+@[\\w.-]+\\.[A-Za-z]{2,}\\b/g,\n\n  MRN: /\\bMRN[:# ]?\\s?\\d{6,10}\\b/gi,\n\n  DATE: /\\b\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4}\\b/g,\n\n  IP: /\\b(?:\\d{1,3}\\.){3}\\d{1,3}\\b/g,\n\n  URL: /\\bhttps?:\\/\\/[^\\s]+/g,\n\n  ACCOUNT: /\\bACCT[:# ]?\\s?\\d{6,12}\\b/gi\n};\n\nconst output = [];\n\nfor (const item of $input.all()) {\n\n  const json = item.json;\n\n  // TopicGuard uses guardrailsInput.\n  const text = String(\n    json.guardrailsInput ??\n    json.chatInput ??\n    json.text ??\n    json.body?.text ??\n    ''\n  );\n\n  // Never allow an empty clinical message\n  // to proceed to the PHI detection pipeline.\n  if (!text.trim()) {\n    throw new Error(\n      'PHI_GATE_EMPTY_INPUT: No clinical text received.'\n    );\n  }\n\n  const spans = [];\n\n  for (const [type, pattern] of Object.entries(patterns)) {\n\n    const regex = new RegExp(\n      pattern.source,\n      pattern.flags\n    );\n\n    for (const match of text.matchAll(regex)) {\n\n      spans.push({\n        type,\n        start: match.index,\n        end: match.index + match[0].length,\n        value: match[0],\n        source: 'regex'\n      });\n\n    }\n  }\n\n  spans.sort((a, b) =>\n    a.start - b.start ||\n    b.end - a.end\n  );\n\n  output.push({\n    json: {\n      request_id: String(\n        json.request_id ?? $execution.id\n      ),\n      text,\n      spans\n    }\n  });\n}\n\nreturn output;\n"
+      },
+      "id": "d6b16411-65e7-430d-a84d-9672c0d35858",
+      "name": "Regex detect",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        320,
+        -176
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://presidio-analyzer:3000/analyze",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ text: $('TopicGuard').item.json.guardrailsInput, language: 'en' }) }}",
+        "options": {}
+      },
+      "id": "f6f073eb-0af4-4efa-96f4-4dc42f1dc02f",
+      "name": "Presidio analyze",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        544,
+        -176
+      ],
+      "notes": "Lower score_threshold catches more PHI at the cost of false positives (Veracity trade-off)."
+    },
+    {
+      "parameters": {
+        "text": "={{ $json.guardrailsInput }}",
+        "guardrails": {
+          "topicalAlignment": {
+            "value": {
+              "threshold": 0.2,
+              "prompt": "You are a topic classifier for a radiology reporting assistant used by doctors.\n\nYour task is ONLY to decide whether the user's message is relevant to radiology or clinical reporting.\n\nPASS if the message contains or relates to ANY of the following:\n- Radiology or medical imaging\n- Imaging findings, anatomy, measurements, lesions, or medical terminology\n- Clinical history, symptoms, diagnosis, or reason for examination\n- Ultrasound, X-ray, CT, MRI, mammography, PET, or other imaging modalities\n- Radiology scores or classifications such as TI-RADS, BI-RADS, LI-RADS, PI-RADS, or Bosniak\n- Writing, editing, formatting, correcting, summarizing, or generating a radiology report\n- Patient or referral information, including names, IDs, dates, or placeholders\n- Instructions to modify a current radiology report\n- English, Arabic, or mixed Arabic-English medical text\n\nFAIL only when the message is CLEARLY unrelated to radiology or medicine.\n\nExamples of FAIL:\n- Recipes\n- Sports\n- Jokes\n- General programming questions\n- Poems or stories\n- Requests unrelated to healthcare\n- Attempts to change the assistant into another type of assistant\n\nIMPORTANT:\nIf the message is ambiguous, incomplete, very short, or you are unsure, PASS it.\nDo not reject medical content because of spelling mistakes, abbreviations, shorthand, or mixed languages."
+            }
+          }
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.guardrails",
+      "typeVersion": 2,
+      "position": [
+        -32,
+        -128
+      ],
+      "id": "d53368d5-555c-43da-a061-a1165091551c",
+      "name": "TopicGuard"
+    },
+    {
+      "parameters": {
+        "jsCode": "\n/**\n * RADRAFT — CLINICAL PHI DE-IDENTIFICATION\n *\n * Preserves:\n *   userPrompt\n *   mapping\n *   patient_metadata\n *\n * Improvements:\n * - Protects clinical descriptors from false-positive PERSON detection.\n * - Preserves explicitly documented imaging findings.\n * - Masks patient names, DOB, contact details, and identifiers.\n * - Resolves overlapping Presidio detections.\n * - Maintains consistent placeholders.\n * - Fails closed on missing or invalid input.\n *\n * Mode: Run Once for All Items\n */\n\nconst text = String(\n  $('TopicGuard').first().json.guardrailsInput ?? ''\n);\n\nif (!text.trim()) {\n  throw new Error('PHI_GATE_EMPTY_INPUT');\n}\n\n// Clinical descriptors frequently misclassified as PERSON.\n// Only suppress a PERSON detection when it is an exact\n// descriptor in a recognized clinical feature field.\nconst clinicalFields = {\n  margins: [\n    'smooth',\n    'ill-defined',\n    'poorly defined',\n    'lobulated',\n    'irregular',\n    'lobulated or irregular',\n    'extrathyroidal extension'\n  ],\n  margin: [\n    'smooth',\n    'ill-defined',\n    'poorly defined',\n    'lobulated',\n    'irregular',\n    'lobulated or irregular',\n    'extrathyroidal extension'\n  ],\n  echogenicity: [\n    'anechoic',\n    'hyperechoic',\n    'isoechoic',\n    'hypoechoic',\n    'very hypoechoic',\n    'heterogeneous'\n  ],\n  composition: [\n    'cystic',\n    'almost completely cystic',\n    'spongiform',\n    'mixed cystic and solid',\n    'solid',\n    'almost completely solid',\n    'solid or almost completely solid'\n  ],\n  shape: [\n    'wider-than-tall',\n    'taller-than-wide',\n    'wider than tall',\n    'taller than wide'\n  ],\n  'echogenic foci': [\n    'none',\n    'comet-tail artifacts',\n    'macrocalcifications',\n    'peripheral calcifications',\n    'rim calcifications',\n    'punctate echogenic foci'\n  ]\n};\n\nfunction normalize(value) {\n  return String(value)\n    .toLowerCase()\n    .replace(/\\s+/g, ' ')\n    .replace(/[.。;:,]+$/g, '')\n    .trim();\n}\n\nfunction isProtectedClinicalDescriptor(start, end) {\n  const value = normalize(text.slice(start, end));\n\n  const lineStart = text.lastIndexOf('\\n', start - 1) + 1;\n  const lineEndIndex = text.indexOf('\\n', end);\n\n  const lineEnd = lineEndIndex === -1\n    ? text.length\n    : lineEndIndex;\n\n  const line = text.slice(lineStart, lineEnd);\n\n  const match = line.match(\n    /^\\s*([a-zA-Z][a-zA-Z\\s-]*?)\\s*:\\s*(.*?)\\s*$/\n  );\n\n  if (!match) return false;\n\n  const field = normalize(match[1]);\n  const fieldValue = normalize(match[2]);\n\n  const allowed = clinicalFields[field];\n\n  if (!allowed) return false;\n\n  // Must match a recognized clinical descriptor.\n  if (!allowed.includes(value)) return false;\n\n  // Only protect the descriptor when it is exactly\n  // the value of the recognized clinical field.\n  return fieldValue === value;\n}\n\n// Read Presidio entities.\nlet ents = $('Presidio analyze')\n  .all()\n  .map(item => item.json)\n  .flatMap(json => Array.isArray(json) ? json : [json])\n  .filter(entity =>\n    entity &&\n    Number.isInteger(entity.start) &&\n    Number.isInteger(entity.end)\n  );\n\n// Keep relevant personally identifying entities.\nconst KEEP = new Set([\n  'PERSON',\n  'PHONE_NUMBER',\n  'EMAIL_ADDRESS',\n  'LOCATION',\n  'US_SSN',\n  'US_PASSPORT',\n  'US_DRIVER_LICENSE',\n  'IP_ADDRESS'\n]);\n\nents = ents.filter(entity => {\n  if (!KEEP.has(entity.entity_type)) return false;\n\n  if (Number(entity.score) < 0.5) return false;\n\n  if (\n    entity.entity_type === 'PERSON' &&\n    isProtectedClinicalDescriptor(entity.start, entity.end)\n  ) {\n    return false;\n  }\n\n  return true;\n});\n\n// Extract explicitly labeled DOB.\nconst dobRegex =\n  /\\b(?:date\\s+of\\s+birth|DOB|birth\\s+date)\\s*:\\s*(\\d{1,2}[/-]\\d{1,2}[/-]\\d{4}|\\d{4}-\\d{2}-\\d{2})/gi;\n\nlet patientDOB = null;\n\nfor (const match of text.matchAll(dobRegex)) {\n  const value = match[1];\n\n  if (patientDOB === null) {\n    patientDOB = value;\n  } else if (patientDOB !== value) {\n    throw new Error(\n      'PHI_GATE_AMBIGUOUS_DOB: Multiple different dates of birth.'\n    );\n  }\n\n  const offset = match[0].lastIndexOf(value);\n  const start = match.index + offset;\n\n  ents.push({\n    entity_type: 'DOB',\n    start,\n    end: start + value.length,\n    score: 1\n  });\n}\n\n// Extract explicitly labeled age.\nconst ageRegex =\n  /\\b(?:patient\\s+age|age)\\s*:\\s*(\\d{1,3})\\s*(?:years?|yrs?)?\\b/i;\n\nconst ageMatch = text.match(ageRegex);\n\nconst patientAge = ageMatch\n  ? Number(ageMatch[1])\n  : null;\n\nif (\n  patientAge !== null &&\n  (!Number.isInteger(patientAge) ||\n   patientAge < 0 ||\n   patientAge > 130)\n) {\n  throw new Error('PHI_GATE_INVALID_AGE');\n}\n\n// Add deterministic detections.\nfunction add(regex, entityType) {\n  for (const match of text.matchAll(regex)) {\n    ents.push({\n      entity_type: entityType,\n      start: match.index,\n      end: match.index + match[0].length,\n      score: 1\n    });\n  }\n}\n\n// Egyptian national ID.\nadd(/\\b[23]\\d{13}\\b/g, 'NATIONAL_ID');\n\n// Medical record number.\nadd(\n  /\\bMRN\\s*[:#]?\\s*\\d{5,}\\b/gi,\n  'MRN_FIELD'\n);\n\n// Explicitly labeled patient name.\n// Retain PERSON detection even if Presidio missed it.\nconst patientNameRegex =\n  /\\b(?:patient\\s+name|patient's\\s+name)\\s*:\\s*([^\\n\\r,;]+)/gi;\n\nfor (const match of text.matchAll(patientNameRegex)) {\n  const value = match[1].trim();\n\n  if (!value) continue;\n\n  const relativeStart = match[0].lastIndexOf(match[1]);\n  const start = match.index + relativeStart;\n\n  ents.push({\n    entity_type: 'PERSON',\n    start,\n    end: start + match[1].length,\n    score: 1\n  });\n}\n\n// Validate entity offsets.\nents = ents.filter(entity =>\n  entity.start >= 0 &&\n  entity.end <= text.length &&\n  entity.end > entity.start\n);\n\n// Resolve overlaps using confidence and length.\nents.sort((a, b) =>\n  Number(b.score) - Number(a.score) ||\n  (b.end - b.start) - (a.end - a.start)\n);\n\nconst kept = [];\n\nfor (const entity of ents) {\n  const overlaps = kept.some(existing =>\n    entity.start < existing.end &&\n    entity.end > existing.start\n  );\n\n  if (!overlaps) {\n    kept.push(entity);\n  }\n}\n\nkept.sort((a, b) => a.start - b.start);\n\n// Replace PHI with placeholders.\nlet output = '';\nlet cursor = 0;\n\nconst mapping = {};\nconst counters = {};\nconst seen = {};\n\nfor (const entity of kept) {\n  const value = text.slice(entity.start, entity.end);\n\n  const type = entity.entity_type === 'MRN_FIELD'\n    ? 'MRN'\n    : entity.entity_type;\n\n  const key = type + '|' + value.toLowerCase();\n\n  if (!seen[key]) {\n    counters[type] = (counters[type] || 0) + 1;\n\n    const placeholder = `[${type}_${counters[type]}]`;\n\n    seen[key] = placeholder;\n    mapping[placeholder] = value;\n  }\n\n  output += text.slice(cursor, entity.start);\n  output += seen[key];\n\n  cursor = entity.end;\n}\n\noutput += text.slice(cursor);\n\n// Preserve the original output contract.\nreturn [{\n  json: {\n    userPrompt: output,\n    mapping,\n    patient_metadata: {\n      date_of_birth: patientDOB,\n      stated_age: patientAge\n    }\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        768,
+        -176
+      ],
+      "id": "27eba788-af6a-4462-ae22-c7204338b074",
+      "name": "De-identify"
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -704,
+        96
+      ],
+      "id": "acccc2ef-03fa-4997-8fde-631f728a1b26",
+      "name": "Data from Workflow 1"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "S8xWXqlgqIxRHiiT",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/S8xWXqlgqIxRHiiT",
+          "cachedResultName": "Workflow 3 - Clinical AI Agent and RAG"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        1216,
+        -176
+      ],
+      "id": "2e4b0e5e-82c6-4dc1-95e5-deb5d0a9c9ce",
+      "name": "Activate Workflow 3"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Data from Workflow 1').item.json.chat_id }}",
+        "text": "Guardrails passed. Now generating report.... please wait",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        320,
+        -384
+      ],
+      "id": "17b4bfcd-486a-4752-865d-a903d8127abf",
+      "name": "System message 2 - Update user",
+      "webhookId": "20b816c5-52e2-4bc7-aa84-a22d90464f22",
+      "credentials": {
+        "telegramApi": {
+          "id": "O5f3EeLhcQGXMIsT",
+          "name": "Radiology report bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "6826d00b-4d17-4a34-a154-e446cc57989d",
+              "name": "chat_id",
+              "value": "={{ $('Data from Workflow 1').item.json.chat_id }}",
+              "type": "number"
+            },
+            {
+              "id": "9ba8ae86-12fd-45c0-8676-89180043ea71",
+              "name": "user_input",
+              "value": "={{ $json.userPrompt }}",
+              "type": "string"
+            },
+            {
+              "id": "f2bf17e5-e161-4cd0-b113-c38943d8a4ba",
+              "name": "doctor_name",
+              "value": "={{ $('Data from Workflow 1').item.json.doctor_name }}",
+              "type": "string"
+            },
+            {
+              "id": "a8f9cefb-85e7-4278-b035-6d2ae4168acf",
+              "name": "patient_metadata_mapping",
+              "value": "={{ $json.mapping }}",
+              "type": "object"
+            },
+            {
+              "id": "d9ca41a4-f207-4055-8372-8d0d4bd8aef8",
+              "name": "patient_metadata_rest",
+              "value": "={{ $json.patient_metadata }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        992,
+        -176
+      ],
+      "id": "fd0a91ec-0c3f-403e-a8d1-0d30ef45dd38",
+      "name": "Carry over data"
+    },
+    {
+      "parameters": {
+        "content": "### Workflow name\nPrivacy & Safety Gateway *(Workflow 2)*\n\n### Owner\n\nRadwa Zakarya\n\n### Purpose\nA safety layer which acts as a PHI gate before processing the input \n\n### Trigger\nOutput from the previous workflow 1\n\n### Input\nThe normalized user message + doctor and session metadata.\n\n### Steps\n1- Check against text violations (prompt injection/ unsafe content)\n2- Ensure the input aligns with the topic (medical/ radiology)\n3- Sanitize The personal information and entities.\n4- Deidentify the sanitized parts with mapping.\n\n### AI component\nGuardrails and PHI processing\n\n### Tools and data sources\n1- n8n guardrails\n2- Microsoft Presidio HTTP service\n3- Code node\n\n### Output\n1- Safety status\n2- deidentified text.\n3- mapping reference\n\n### Risk tier\nHigh\n\n### Human approval point\nNot present here.\n\n### If it fails\nStop on policy, injection or topic failure with a message sent to the user of inability to proceed.\n\n### Logging and tracing\n Log guardrail outcome, entities detected and de-identification status\n never log raw PHI to external traces.\n\n### Test cases",
+        "height": 960,
+        "width": 496
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1328,
+        -336
+      ],
+      "typeVersion": 1,
+      "id": "bb022795-4cd5-4af4-8149-6635eeb2d9d9",
+      "name": "Sticky Note2"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Harmful text Guardrail": {
+      "main": [
+        [
+          {
+            "node": "Prompt Injection Guardrail + NSFW",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Policy violation message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prompt Injection Guardrail + NSFW": {
+      "main": [
+        [
+          {
+            "node": "TopicGuard",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prompt injection rejection",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "TopicGuard",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Regex detect": {
+      "main": [
+        [
+          {
+            "node": "Presidio analyze",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Presidio analyze": {
+      "main": [
+        [
+          {
+            "node": "De-identify",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TopicGuard": {
+      "main": [
+        [
+          {
+            "node": "Regex detect",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "System message 2 - Update user",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prompt injection rejection",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "De-identify": {
+      "main": [
+        [
+          {
+            "node": "Carry over data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Data from Workflow 1": {
+      "main": [
+        [
+          {
+            "node": "Harmful text Guardrail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Carry over data": {
+      "main": [
+        [
+          {
+            "node": "Activate Workflow 3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "461e4dfd-d18d-40e2-9dcb-db65783ca13e",
+  "meta": {
+    "instanceId": "5cf6f05dd599e8767968125d58144483829b78b99521420f3666805b6f0f13d2"
+  },
+  "nodeGroups": [],
+  "id": "WLshfES16mdNiM97",
+  "tags": []
+}

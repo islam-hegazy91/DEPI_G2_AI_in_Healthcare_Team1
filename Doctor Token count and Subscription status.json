@@ -1,0 +1,256 @@
+{
+  "name": "Doctor Token count and Subscription status",
+  "nodes": [
+    {
+      "parameters": {
+        "mode": "expression",
+        "output": "=\n{{\n  Number($json.sessions_available) >= 10 ? 0 :\n  Number($json.sessions_available) >= 2 ? 1 :\n  Number($json.sessions_available) === 1 ? 2 :\n  Number($json.sessions_available) === 0 ? 3 :\n  -1\n}}\n"
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        624,
+        16
+      ],
+      "id": "45bd87e5-0577-4993-b8d4-338c58c006f8",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        208,
+        48
+      ],
+      "id": "2443e24d-07bb-442a-8518-71f5bd9aa795",
+      "name": "When Executed by Report Workflow"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "\nUPDATE authorized_users\nSET sessions_available = sessions_available - 1\nWHERE telegram_id = $1\n  AND sessions_available >= 1\nRETURNING\n    telegram_id,\n    sessions_available;\n",
+        "options": {
+          "queryReplacement": "={{ $('When Executed by Report Workflow').first().json.chat_id }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        416,
+        48
+      ],
+      "id": "c699d29f-0e2e-48fd-86e3-4d132908b5e3",
+      "name": "Update number of reports left for doctor",
+      "credentials": {
+        "postgres": {
+          "id": "XGwfwfvSssHEEG48",
+          "name": "Local Postgres for Radiology Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "\nUPDATE authorized_users\nSET status = 'inactive'\nWHERE telegram_id = $1\n  AND sessions_available = 0\nRETURNING\n    telegram_id,\n    sessions_available,\n    status;\n",
+        "options": {
+          "queryReplacement": "={{ $('When Executed by Report Workflow').first().json.chat_id }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        864,
+        384
+      ],
+      "id": "7f5da70a-885d-441f-9ecb-df23515de8ca",
+      "name": "Turn account inactive",
+      "credentials": {
+        "postgres": {
+          "id": "XGwfwfvSssHEEG48",
+          "name": "Local Postgres for Radiology Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('When Executed by Report Workflow').item.json.chat_id }}",
+        "text": "=Automated Message:\n\n##Thank you for using our solution##,\n\nKindly note that currently, you have {{ $json.sessions_available }} reports remaining in your subscription.\n\nPlease note that you have no more reports available in your subscription. \nKindly contact our team for renewing your subscription to ensring the continous use of our solution",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1088,
+        384
+      ],
+      "id": "d999b14d-77d0-40fd-bb15-edd9bfe89ad0",
+      "name": "Inactivity text",
+      "webhookId": "60066a81-09ac-42c6-a56e-abf31cf259d3",
+      "credentials": {
+        "telegramApi": {
+          "id": "O5f3EeLhcQGXMIsT",
+          "name": "Radiology report bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('When Executed by Report Workflow').item.json.chat_id }}",
+        "text": "=Automated Message:\n\n##Thank you for using our solution##,\n\nKindly note that currently, you have {{ $json.sessions_available }} reports remaining in your subscription.\n\nPlease note that you have ##one report## in your subscription. We advise you to contact our team for renewing your subscription to ensring the continous use of our solution",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1088,
+        176
+      ],
+      "id": "de10782b-7dd2-4edf-bfc5-62ac924d6371",
+      "name": "Last report message",
+      "webhookId": "c6b08c59-7391-4acb-b1ab-e66668ca1959",
+      "credentials": {
+        "telegramApi": {
+          "id": "O5f3EeLhcQGXMIsT",
+          "name": "Radiology report bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('When Executed by Report Workflow').item.json.chat_id }}",
+        "text": "=Automated Message:\n\n##Thank you for using our solution##,\n\nKindly note that currently, you have {{ $json.sessions_available }} reports remaining in your subscription.\n\nPlease note that you have less than 10 reports in your subscription. We advise you to contact our team for renewing your subscription to ensring the continous use of our solution",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1072,
+        -48
+      ],
+      "id": "e4909846-6851-4e7b-ac44-06d48a30383a",
+      "name": "Less then 10 message",
+      "webhookId": "89e5a52f-1b7d-4bc1-856b-b866702ffbb9",
+      "credentials": {
+        "telegramApi": {
+          "id": "O5f3EeLhcQGXMIsT",
+          "name": "Radiology report bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('When Executed by Report Workflow').item.json.chat_id }}",
+        "text": "=Thank you for using our solution,\n\nKindly note that currently, you have {{ $json.sessions_available }} reports remaining in your subscription.\n",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1072,
+        -272
+      ],
+      "id": "ad27e9fb-7cc6-42e8-80bf-30a0b2353a44",
+      "name": "Current count of reports left",
+      "webhookId": "2ede10b3-6ad9-433f-bd3d-9091173731f4",
+      "credentials": {
+        "telegramApi": {
+          "id": "O5f3EeLhcQGXMIsT",
+          "name": "Radiology report bot"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Current count of reports left",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Less then 10 message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Last report message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Turn account inactive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Executed by Report Workflow": {
+      "main": [
+        [
+          {
+            "node": "Update number of reports left for doctor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update number of reports left for doctor": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Turn account inactive": {
+      "main": [
+        [
+          {
+            "node": "Inactivity text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "0eb869a7-a2c1-472b-886b-04d3bf06f6d2",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "5cf6f05dd599e8767968125d58144483829b78b99521420f3666805b6f0f13d2"
+  },
+  "nodeGroups": [],
+  "id": "U7c5jnemTJ7zqLeL",
+  "tags": []
+}

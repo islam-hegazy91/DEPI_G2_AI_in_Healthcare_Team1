@@ -1,0 +1,681 @@
+{
+  "name": "Workflow 1 - User identification Gateway (Islam)",
+  "nodes": [
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "df5cfcdd-d33a-48c5-8654-68fe0590cffc",
+                    "leftValue": "={{ $json.message?.voice || $json.message?.audio ? 'audio' : $json.message?.text ? 'text' : 'other' }}",
+                    "rightValue": "audio",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Audio"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "82992567-d78a-431a-b8d4-5ace5a5079b0",
+                    "leftValue": "={{ $json.message?.voice || $json.message?.audio ? 'audio' : $json.message?.text ? 'text' : 'other' }}",
+                    "rightValue": "text",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Text"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "01308b71-f854-46db-865a-568ef98e5eb4",
+                    "leftValue": "={{ $json.message?.voice || $json.message?.audio ? 'audio' : $json.message?.text ? 'text' : 'other' }}",
+                    "rightValue": "other",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Other"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        544,
+        -128
+      ],
+      "id": "3a64c765-2767-499f-aafa-3798b44684ef",
+      "name": "Audio or Text?"
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "fileId": "={{ $json.message.voice.file_id }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        768,
+        -288
+      ],
+      "id": "c21aa0da-c290-40e5-a829-38ed2d9d5819",
+      "name": "Download Audio file",
+      "webhookId": "27c5835e-cac1-4c61-889d-04704440981c",
+      "credentials": {
+        "telegramApi": {
+          "id": "O5f3EeLhcQGXMIsT",
+          "name": "Radiology report bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.5,
+      "position": [
+        -576,
+        80
+      ],
+      "id": "7fb5e52c-d130-48d5-9c5f-341b80c101de",
+      "name": "Doctor's input in telegram (Audio/Text)",
+      "webhookId": "9d36c065-59d4-4142-bd03-bae92b559246",
+      "credentials": {
+        "telegramApi": {
+          "id": "O5f3EeLhcQGXMIsT",
+          "name": "Radiology report bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Doctor\\'s input in telegram (Audio/Text)').item.json.message.from.id }}",
+        "text": "Access denied. Our AI solution does not support bot inputs, only authorized humans are allowed to proceed.",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -128,
+        176
+      ],
+      "id": "910af2c2-6146-4e70-9ba2-e130effe0f01",
+      "name": "Access denied node for bots",
+      "webhookId": "34b3f0c7-170c-4458-8702-a0e32b96b304",
+      "credentials": {
+        "telegramApi": {
+          "id": "O5f3EeLhcQGXMIsT",
+          "name": "Radiology report bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "fb99f787-2674-4f60-b545-4e7ce5a50ba2",
+              "leftValue": "={{ $json.message.from.is_bot }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "cf5961a6-6396-407b-bed3-5083c5afd3ec",
+              "leftValue": "={{ $json.message.from.is_bot }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -352,
+        80
+      ],
+      "id": "9eb0ff5e-50b3-4348-a32f-b500ad1939c6",
+      "name": "Human or Bot confirmation"
+    },
+    {
+      "parameters": {
+        "resource": "audio",
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-3.6-flash",
+          "mode": "list",
+          "cachedResultName": "models/gemini-3.6-flash"
+        },
+        "inputType": "binary",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        992,
+        -288
+      ],
+      "id": "7f529ee7-b2ea-44e9-acf4-73fe69960712",
+      "name": "Transcribe a recording",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "Co8jP6A449PkJPPa",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Doctor\\'s input in telegram (Audio/Text)').item.json.message.chat.id }}",
+        "text": "Invalid input. Please try again, using either Text or Audio.",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        768,
+        0
+      ],
+      "id": "9ad773f0-4c64-455b-83ec-28c9fc8504ce",
+      "name": "Invalid input",
+      "webhookId": "5f78218e-1aeb-4bf7-8faf-7cb3459be766",
+      "credentials": {
+        "telegramApi": {
+          "id": "O5f3EeLhcQGXMIsT",
+          "name": "Radiology report bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "637b7e52-d5da-4aee-b818-0866536f665f",
+              "leftValue": "={{ $json.is_authorized }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        96,
+        -16
+      ],
+      "id": "ff5c86d6-9227-4015-af8c-d6f303b59499",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT EXISTS (\n  SELECT 1 FROM authorized_users\n  WHERE telegram_id = $1\n    AND account_status = 'active'\n    AND sessions_available > 0\n) AS is_authorized;",
+        "options": {
+          "queryReplacement": "=   {{ $('Doctor\\'s input in telegram (Audio/Text)').item.json.message.from.id }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        -128,
+        -16
+      ],
+      "id": "2ef1d492-ebaa-48d7-9813-f08a1c4cdb7d",
+      "name": "User Authorization Check",
+      "credentials": {
+        "postgres": {
+          "id": "XGwfwfvSssHEEG48",
+          "name": "Local Postgres for Radiology Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Doctor\\'s input in telegram (Audio/Text)').item.json.message.from.id }}",
+        "text": "User not authorized to use chat, check with the customer support team for more help",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        320,
+        80
+      ],
+      "id": "05927cf7-712a-41cb-b776-c50aa2aee443",
+      "name": "User not authorized",
+      "webhookId": "cb75c86c-5133-47f1-a9a1-15695a93e54c",
+      "credentials": {
+        "telegramApi": {
+          "id": "O5f3EeLhcQGXMIsT",
+          "name": "Radiology report bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "25cb2791-901d-4abd-aabe-8c8d9c753547",
+              "name": "message",
+              "value": "={{ $('Doctor\\'s input in telegram (Audio/Text)').item.json.message }}",
+              "type": "object"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        320,
+        -112
+      ],
+      "id": "55a4c724-77b6-45ed-a442-938862d96a31",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Doctor\\'s input in telegram (Audio/Text)').item.json.message.chat.id }}",
+        "text": "Authorization granted. Checking input for violations.....",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        320,
+        -320
+      ],
+      "id": "fdfa2ea5-2300-4894-bdfc-027a71ac66c2",
+      "name": "System message 1 - Update user",
+      "webhookId": "20b816c5-52e2-4bc7-aa84-a22d90464f22",
+      "credentials": {
+        "telegramApi": {
+          "id": "O5f3EeLhcQGXMIsT",
+          "name": "Radiology report bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "WLshfES16mdNiM97",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/WLshfES16mdNiM97",
+          "cachedResultName": "Workflow 2 - Privacy and Guardrails"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        2080,
+        -112
+      ],
+      "id": "f89f3eb0-71e0-4050-83b5-611cc0836a73",
+      "name": "Activate Workflow 2"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "\nSELECT\n    telegram_id,\n    full_name AS doctor_name\nFROM public.authorized_users\nWHERE telegram_id = $1\nLIMIT 1;\n",
+        "options": {
+          "queryReplacement": "={{ $('Doctor\\'s input in telegram (Audio/Text)').first().json.message.chat.id }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        1632,
+        0
+      ],
+      "id": "f59928de-6557-4693-b2a1-9a7afee6c582",
+      "name": "Get Doctor Details",
+      "credentials": {
+        "postgres": {
+          "id": "XGwfwfvSssHEEG48",
+          "name": "Local Postgres for Radiology Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "6826d00b-4d17-4a34-a154-e446cc57989d",
+              "name": "chat_id",
+              "value": "={{ $('Doctor\\'s input in telegram (Audio/Text)').item.json.message.chat.id }}",
+              "type": "number"
+            },
+            {
+              "id": "9ba8ae86-12fd-45c0-8676-89180043ea71",
+              "name": "user_input",
+              "value": "={{ $('User input').item.json.user_message }}",
+              "type": "string"
+            },
+            {
+              "id": "f2bf17e5-e161-4cd0-b113-c38943d8a4ba",
+              "name": "doctor_name",
+              "value": "={{ $json.doctor_name }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        1856,
+        0
+      ],
+      "id": "c621365f-1b7a-43ce-a6da-80093f273966",
+      "name": "Carry over data"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "06f56cc1-0644-49e0-bcb0-e64beb1fc999",
+              "name": "user_message",
+              "value": "={{ $json.content?.parts?.[0]?.text || $json.message?.text || '' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        1392,
+        -112
+      ],
+      "id": "5aa530e6-6005-4fef-82af-0770323eb3bd",
+      "name": "User input"
+    },
+    {
+      "parameters": {
+        "content": "### Workflow name\nAccess and input gateway *(Workflow 1)*\n\n### Owner\n\nIslam Hegazy\n\n### Purpose\nGive access only to the authenticated users and transcribe the audio input. \n\n### Trigger\nSending a message to the telegram bot\n\n### Input\ndoctor ID, chat ID, the sent message itself (text/ voice note/ audio file)\n\n### Steps\n1- Human/ bot check.\n2- Authentication check.\n3- Detection of the message type (text/ voice note/ audio)\n4- Transcribing the audio.\n5- Normalize into user message.\n\n### AI component \nSpeech transcription (through a transcription model)\n\n### Tools and data sources\n1- Telegram (trigger/ action)\n2- Postgres SQL\n3- Role based routing nodes (If/ Switch)\n4- Gemini transcription model\n\n### Output\nAuthorized normalized requests with doctor and session metadata.\n\n### Risk tier\nMedium\n\n### Human approval point\nNo clinical output released; unauthorized/bot requests stop before AI processing.\n\n### If it fails\nReject unsupported input; deny unauthorized users; return a safe message.\n\n### Logging and tracing\nLog user/session ID, input type, authentication result, transcription status. \nTrace in LangSmith once enabled.\n\n### Test cases\n",
+        "height": 896,
+        "width": 646
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1296,
+        -416
+      ],
+      "typeVersion": 1,
+      "id": "f8d69828-1023-4ae6-9ac4-7eb6b08ab7dd",
+      "name": "Sticky Note"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Audio or Text?": {
+      "main": [
+        [
+          {
+            "node": "Download Audio file",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "User input",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Invalid input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Audio file": {
+      "main": [
+        [
+          {
+            "node": "Transcribe a recording",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Doctor's input in telegram (Audio/Text)": {
+      "main": [
+        [
+          {
+            "node": "Human or Bot confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Human or Bot confirmation": {
+      "main": [
+        [
+          {
+            "node": "User Authorization Check",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Access denied node for bots",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transcribe a recording": {
+      "main": [
+        [
+          {
+            "node": "User input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "System message 1 - Update user",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "User not authorized",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "User Authorization Check": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Audio or Text?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Doctor Details": {
+      "main": [
+        [
+          {
+            "node": "Carry over data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Carry over data": {
+      "main": [
+        [
+          {
+            "node": "Activate Workflow 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "User input": {
+      "main": [
+        [
+          {
+            "node": "Get Doctor Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "ea021674-badf-4ac7-91e9-e1522f3c6cad",
+  "meta": {
+    "instanceId": "5cf6f05dd599e8767968125d58144483829b78b99521420f3666805b6f0f13d2"
+  },
+  "nodeGroups": [],
+  "id": "Okekx7mXqoYJ6jIb",
+  "tags": []
+}
